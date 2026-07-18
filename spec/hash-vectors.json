@@ -1,0 +1,128 @@
+{
+  "algorithm": "murmur3_x86_32",
+  "encoding": "utf-8",
+  "bucketScale": 10000,
+  "bucketInput": "{key}.{salt}.{value}",
+  "hashVectors": [
+    {
+      "input": "",
+      "seed": 0,
+      "hash": 0
+    },
+    {
+      "input": "a",
+      "seed": 0,
+      "hash": 1009084850
+    },
+    {
+      "input": "ab",
+      "seed": 0,
+      "hash": 2613040991
+    },
+    {
+      "input": "abc",
+      "seed": 0,
+      "hash": 3017643002
+    },
+    {
+      "input": "abcd",
+      "seed": 0,
+      "hash": 1139631978
+    },
+    {
+      "input": "abcde",
+      "seed": 0,
+      "hash": 3902511862
+    },
+    {
+      "input": "hello",
+      "seed": 0,
+      "hash": 613153351
+    },
+    {
+      "input": "The quick brown fox jumps over the lazy dog",
+      "seed": 0,
+      "hash": 776992547
+    },
+    {
+      "input": "user-123",
+      "seed": 0,
+      "hash": 2674956871
+    },
+    {
+      "input": "new-checkout.5f1d.user-123",
+      "seed": 0,
+      "hash": 1568458957
+    },
+    {
+      "input": "ação-çãé",
+      "seed": 0,
+      "hash": 4286790597
+    },
+    {
+      "input": "日本語テキスト",
+      "seed": 0,
+      "hash": 3871913517
+    },
+    {
+      "input": "emoji-🚀",
+      "seed": 0,
+      "hash": 4083783077
+    },
+    {
+      "input": "hello",
+      "seed": 42,
+      "hash": 3806057185
+    }
+  ],
+  "bucketVectors": [
+    {
+      "key": "new-ui",
+      "salt": "s1",
+      "value": "user-1",
+      "bucket": 4535
+    },
+    {
+      "key": "new-ui",
+      "salt": "s1",
+      "value": "user-2",
+      "bucket": 4930
+    },
+    {
+      "key": "new-ui",
+      "salt": "s2",
+      "value": "user-1",
+      "bucket": 5115
+    },
+    {
+      "key": "checkout-flow",
+      "salt": "a8f3",
+      "value": "42",
+      "bucket": 7980
+    },
+    {
+      "key": "checkout-flow",
+      "salt": "a8f3.traffic",
+      "value": "42",
+      "bucket": 8219
+    },
+    {
+      "key": "pricing-page",
+      "salt": "x",
+      "value": "joão@example.com",
+      "bucket": 4953
+    },
+    {
+      "key": "dark-mode",
+      "salt": "0",
+      "value": "anonymous-7f2c",
+      "bucket": 6533
+    },
+    {
+      "key": "search-v2",
+      "salt": "salt",
+      "value": "u-999999",
+      "bucket": 7154
+    }
+  ]
+}
