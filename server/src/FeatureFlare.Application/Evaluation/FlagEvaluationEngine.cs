@@ -1,5 +1,6 @@
 using FeatureFlare.Domain.Evaluation;
 using FeatureFlare.Domain.Flags;
+using FeatureFlare.Domain.Segments;
 
 namespace FeatureFlare.Application.Evaluation;
 
@@ -14,10 +15,16 @@ namespace FeatureFlare.Application.Evaluation;
 /// </summary>
 public sealed class FlagEvaluationEngine
 {
-    public FlagEvaluation Evaluate(FeatureFlag flag, EvaluationContext context)
+    private static readonly IReadOnlyDictionary<string, Segment> NoSegments = new Dictionary<string, Segment>();
+
+    public FlagEvaluation Evaluate(
+        FeatureFlag flag,
+        EvaluationContext context,
+        IReadOnlyDictionary<string, Segment>? segments = null)
     {
         ArgumentNullException.ThrowIfNull(flag);
         ArgumentNullException.ThrowIfNull(context);
+        segments ??= NoSegments;
 
         if (!flag.Enabled)
         {
@@ -26,7 +33,7 @@ public sealed class FlagEvaluationEngine
 
         foreach (var rule in flag.Rules)
         {
-            if (rule.Clauses.All(clause => ClauseMatcher.Matches(clause, context)))
+            if (rule.Clauses.All(clause => ClauseMatcher.Matches(clause, context, segments)))
             {
                 return Resolve(flag, rule.Serve, context, EvaluationReason.RuleMatch, rule.Id);
             }

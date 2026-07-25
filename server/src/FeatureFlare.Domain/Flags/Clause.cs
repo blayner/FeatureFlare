@@ -14,6 +14,9 @@ public enum ClauseOperator
     SemVerEqual,
     SemVerLessThan,
     SemVerGreaterThan,
+
+    /// <summary>Values are segment keys; matches when the context belongs to any of them.</summary>
+    InSegment,
 }
 
 /// <summary>
@@ -24,4 +27,7 @@ public enum ClauseOperator
 public sealed record Clause(string Attribute, ClauseOperator Operator, IReadOnlyList<string> Values, bool Negate = false)
 {
     public const string KeyAttribute = "key";
+
+    public static Clause InSegments(params string[] segmentKeys) =>
+        new(KeyAttribute, ClauseOperator.InSegment, segmentKeys);
 }

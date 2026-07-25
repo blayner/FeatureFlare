@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using FeatureFlare.Domain.Evaluation;
 using FeatureFlare.Domain.Flags;
+using FeatureFlare.Domain.Segments;
 
 namespace FeatureFlare.Application.Evaluation;
 
@@ -11,8 +12,19 @@ public static class ClauseMatcher
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(25);
     private static readonly ConcurrentDictionary<string, Regex?> RegexCache = new(StringComparer.Ordinal);
 
-    public static bool Matches(Clause clause, EvaluationContext context)
+    public static bool Matches(
+        Clause clause,
+        EvaluationContext context,
+        IReadOnlyDictionary<string, Segment>? segments = null)
     {
+        if (clause.Operator == ClauseOperator.InSegment)
+        {
+            var member = segments is not null && clause.Values.Any(key =>
+                segments.TryGetValue(key, out var segment) && SegmentMatcher.Contains(segment, context));
+
+            return clause.Negate ? !member : member;
+        }
+
         if (!context.TryGetValues(clause.Attribute, out var actualValues) || actualValues.Count == 0)
         {
             // Missing attributes never match, regardless of negation. Otherwise "country not in [BR]"

@@ -121,6 +121,14 @@ public sealed class FeatureFlag : AggregateRoot
     public Variation? FindVariation(string? key) =>
         key is null ? null : _variations.FirstOrDefault(v => v.Key == key);
 
+    /// <summary>Segment keys referenced by any rule, used to keep referential integrity on segment deletion.</summary>
+    public IReadOnlySet<string> ReferencedSegments() =>
+        _rules
+            .SelectMany(r => r.Clauses)
+            .Where(c => c.Operator == ClauseOperator.InSegment)
+            .SelectMany(c => c.Values)
+            .ToHashSet(StringComparer.Ordinal);
+
     private void ApplyVariations(IEnumerable<Variation> variations, string offVariation, Serve fallthrough)
     {
         var list = variations?.ToList() ?? throw new DomainException("Variations are required.");
@@ -292,6 +300,10 @@ internal static class ClauseValidator
                         throw new DomainException($"{owner} has an invalid regular expression '{value}'.");
                     }
 
+                    break;
+
+                case ClauseOperator.InSegment:
+                    Guard.Key(value, "Segment");
                     break;
 
                 case ClauseOperator.LessThan or ClauseOperator.LessThanOrEqual
