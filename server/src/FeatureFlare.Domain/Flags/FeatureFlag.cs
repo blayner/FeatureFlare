@@ -5,8 +5,15 @@ using FeatureFlare.Domain.Common;
 
 namespace FeatureFlare.Domain.Flags;
 
+/// <summary>
+/// Feature flag aggregate. Every mutation validates the complete new configuration first and only then
+/// assigns it, so a rejected change never leaves the aggregate half-updated.
+/// </summary>
 public sealed class FeatureFlag : AggregateRoot
 {
+    public const int MaxVariations = 50;
+    public const int MaxRules = 200;
+
     private List<Variation> _variations = [];
     private List<TargetingRule> _rules = [];
 
@@ -50,19 +57,24 @@ public sealed class FeatureFlag : AggregateRoot
         Serve fallthrough,
         IEnumerable<TargetingRule>? rules = null)
     {
-        var flag = new FeatureFlag
+        var validKey = Guard.Key(key, "Flag");
+        var validName = Guard.NotEmpty(name, "Flag name");
+        var validDescription = Guard.Optional(description, "Flag description");
+        var config = Validate(type, variations, offVariation, fallthrough, rules ?? []);
+
+        return new FeatureFlag
         {
-            Key = Guard.Key(key, "Flag"),
-            Name = Guard.NotEmpty(name, "Flag name"),
-            Description = Guard.Optional(description, "Flag description"),
+            Key = validKey,
+            Name = validName,
+            Description = validDescription,
             Type = type,
             Enabled = false,
             Salt = Guid.NewGuid().ToString("N"),
+            _variations = config.Variations,
+            OffVariation = offVariation,
+            Fallthrough = fallthrough,
+            _rules = config.Rules,
         };
-
-        flag.ApplyVariations(variations, offVariation, fallthrough);
-        flag.ApplyRules(rules ?? []);
-        return flag;
     }
 
     public static FeatureFlag CreateBoolean(string key, string name, string? description = null) =>
@@ -75,10 +87,39 @@ public sealed class FeatureFlag : AggregateRoot
             offVariation: "off",
             fallthrough: Serve.Fixed("on"));
 
+    /// <summary>Replaces the whole configuration atomically (one version bump).</summary>
+    public void Reconfigure(
+        string name,
+        string? description,
+        IEnumerable<Variation> variations,
+        string offVariation,
+        Serve fallthrough,
+        IEnumerable<TargetingRule> rules)
+    {
+        var validName = Guard.NotEmpty(name, "Flag name");
+        var validDescription = Guard.Optional(description, "Flag description");
+        var config = Validate(Type, variations, offVariation, fallthrough, rules);
+
+        Name = validName;
+        Description = validDescription;
+        _variations = config.Variations;
+        OffVariation = offVariation;
+        Fallthrough = fallthrough;
+        _rules = config.Rules;
+        Touch();
+    }
+
     public void UpdateDetails(string name, string? description)
     {
-        Name = Guard.NotEmpty(name, "Flag name");
+        var validName = Guard.NotEmpty(name, "Flag name");
         Description = Guard.Optional(description, "Flag description");
+        Name = validName;
+        Touch();
+    }
+
+    public void ReplaceRules(IEnumerable<TargetingRule> rules)
+    {
+        _rules = ValidateRules(_variations, rules);
         Touch();
     }
 
@@ -93,43 +134,47 @@ public sealed class FeatureFlag : AggregateRoot
         Touch();
     }
 
-    public void ReplaceVariations(IEnumerable<Variation> variations, string offVariation, Serve fallthrough)
-    {
-        ApplyVariations(variations, offVariation, fallthrough);
-
-        // Rules may reference variations that no longer exist.
-        foreach (var rule in _rules)
-        {
-            ValidateServe(rule.Serve, $"Rule '{rule.Id}'");
-        }
-
-        Touch();
-    }
-
-    public void ReplaceRules(IEnumerable<TargetingRule> rules)
-    {
-        ApplyRules(rules);
-        Touch();
-    }
-
     public void RotateSalt()
     {
         Salt = Guid.NewGuid().ToString("N");
         Touch();
     }
 
-    public Variation? FindVariation(string? key) =>
-        key is null ? null : _variations.FirstOrDefault(v => v.Key == key);
+    public Variation? FindVariation(string? key) => Find(_variations, key);
 
     /// <summary>Segment keys referenced by any rule, used to keep referential integrity on segment deletion.</summary>
-    public IReadOnlySet<string> ReferencedSegments() =>
-        _rules
+    public IReadOnlySet<string> ReferencedSegments() => ReferencedSegments(_rules);
+
+    public static IReadOnlySet<string> ReferencedSegments(IEnumerable<TargetingRule> rules) =>
+        rules
             .SelectMany(r => r.Clauses)
             .Where(c => c.Operator == ClauseOperator.InSegment)
             .SelectMany(c => c.Values)
             .ToHashSet(StringComparer.Ordinal);
 
-    private void ApplyVariations(IEnumerable<Variation> variations, string offVariation, Serve fallthrough)
+    private static Variation? Find(IReadOnlyList<Variation> variations, string? key) =>
+        key is null ? null : variations.FirstOrDefault(v => v.Key == key);
+
+    private static (List<Variation> Variations, List<TargetingRule> Rules) Validate(
+        FlagType type,
+        IEnumerable<Variation> variations,
+        string offVariation,
+        Serve fallthrough,
+        IEnumerable<TargetingRule> rules)
+    {
+        var validVariations = ValidateVariations(type, variations);
+
+        if (Find(validVariations, offVariation) is null)
+        {
+            throw new DomainException($"Off variation '{offVariation}' does not exist.");
+        }
+
+        ValidateServe(validVariations, fallthrough, "Fallthrough");
+        var validRules = ValidateRules(validVariations, rules);
+        return (validVariations, validRules);
+    }
+
+    private static List<Variation> ValidateVariations(FlagType type, IEnumerable<Variation> variations)
     {
         var list = variations?.ToList() ?? throw new DomainException("Variations are required.");
 
@@ -138,9 +183,9 @@ public sealed class FeatureFlag : AggregateRoot
             throw new DomainException("A flag needs at least two variations.");
         }
 
-        if (list.Count > 50)
+        if (list.Count > MaxVariations)
         {
-            throw new DomainException("A flag supports at most 50 variations.");
+            throw new DomainException($"A flag supports at most {MaxVariations} variations.");
         }
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -152,10 +197,10 @@ public sealed class FeatureFlag : AggregateRoot
                 throw new DomainException($"Duplicated variation key '{variation.Key}'.");
             }
 
-            EnsureValueMatchesType(variation);
+            EnsureValueMatchesType(type, variation);
         }
 
-        if (Type == FlagType.Boolean)
+        if (type == FlagType.Boolean)
         {
             var values = list.Select(v => v.Value.Trim()).ToHashSet(StringComparer.Ordinal);
             if (list.Count != 2 || !values.SetEquals(["true", "false"]))
@@ -164,23 +209,18 @@ public sealed class FeatureFlag : AggregateRoot
             }
         }
 
-        _variations = list;
-
-        if (FindVariation(offVariation) is null)
-        {
-            throw new DomainException($"Off variation '{offVariation}' does not exist.");
-        }
-
-        ValidateServe(fallthrough, "Fallthrough");
-        OffVariation = offVariation;
-        Fallthrough = fallthrough;
+        return list;
     }
 
-    private void ApplyRules(IEnumerable<TargetingRule> rules)
+    private static List<TargetingRule> ValidateRules(IReadOnlyList<Variation> variations, IEnumerable<TargetingRule> rules)
     {
-        var list = rules.ToList();
-        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var list = rules?.ToList() ?? [];
+        if (list.Count > MaxRules)
+        {
+            throw new DomainException($"A flag supports at most {MaxRules} rules.");
+        }
 
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var rule in list)
         {
             if (string.IsNullOrWhiteSpace(rule.Id) || !ids.Add(rule.Id))
@@ -198,65 +238,63 @@ public sealed class FeatureFlag : AggregateRoot
                 ClauseValidator.Validate(clause, $"Rule '{rule.Id}'");
             }
 
-            ValidateServe(rule.Serve, $"Rule '{rule.Id}'");
+            ValidateServe(variations, rule.Serve, $"Rule '{rule.Id}'");
         }
 
-        _rules = list;
+        return list;
     }
 
-    private void ValidateServe(Serve serve, string owner)
+    private static void ValidateServe(IReadOnlyList<Variation> variations, Serve? serve, string owner)
     {
         if (serve is null)
         {
             throw new DomainException($"{owner} must serve a variation or a rollout.");
         }
 
-        switch (serve)
+        if (serve.Variation is not null && serve.Rollout is null)
         {
-            case { Variation: not null, Rollout: null }:
-                if (FindVariation(serve.Variation) is null)
-                {
-                    throw new DomainException($"{owner} serves unknown variation '{serve.Variation}'.");
-                }
+            if (Find(variations, serve.Variation) is null)
+            {
+                throw new DomainException($"{owner} serves unknown variation '{serve.Variation}'.");
+            }
 
-                break;
+            return;
+        }
 
-            case { Variation: null, Rollout: not null }:
-                var weights = serve.Rollout.Variations;
-                if (weights is null || weights.Count == 0)
-                {
-                    throw new DomainException($"{owner} rollout has no variations.");
-                }
+        if (serve.Variation is not null || serve.Rollout is null)
+        {
+            throw new DomainException($"{owner} must serve either a variation or a rollout, not both.");
+        }
 
-                foreach (var weighted in weights)
-                {
-                    if (FindVariation(weighted.Variation) is null)
-                    {
-                        throw new DomainException($"{owner} rollout references unknown variation '{weighted.Variation}'.");
-                    }
+        var weights = serve.Rollout.Variations;
+        if (weights is null || weights.Count == 0)
+        {
+            throw new DomainException($"{owner} rollout has no variations.");
+        }
 
-                    if (weighted.Weight < 0)
-                    {
-                        throw new DomainException($"{owner} rollout has a negative weight.");
-                    }
-                }
+        foreach (var weighted in weights)
+        {
+            if (Find(variations, weighted.Variation) is null)
+            {
+                throw new DomainException($"{owner} rollout references unknown variation '{weighted.Variation}'.");
+            }
 
-                if (weights.Sum(w => w.Weight) != Rollout.TotalWeight)
-                {
-                    throw new DomainException($"{owner} rollout weights must sum to {Rollout.TotalWeight} (100%).");
-                }
+            if (weighted.Weight < 0)
+            {
+                throw new DomainException($"{owner} rollout has a negative weight.");
+            }
+        }
 
-                break;
-
-            default:
-                throw new DomainException($"{owner} must serve either a variation or a rollout, not both.");
+        if (weights.Sum(w => w.Weight) != Rollout.TotalWeight)
+        {
+            throw new DomainException($"{owner} rollout weights must sum to {Rollout.TotalWeight} (100%).");
         }
     }
 
-    private void EnsureValueMatchesType(Variation variation)
+    private static void EnsureValueMatchesType(FlagType type, Variation variation)
     {
         var kind = Guard.Json(variation.Value, $"Variation '{variation.Key}' value");
-        var ok = Type switch
+        var ok = type switch
         {
             FlagType.Boolean => kind is JsonValueKind.True or JsonValueKind.False,
             FlagType.String => kind is JsonValueKind.String,
@@ -267,7 +305,8 @@ public sealed class FeatureFlag : AggregateRoot
 
         if (!ok)
         {
-            throw new DomainException($"Variation '{variation.Key}' value is not a valid {Type.ToString().ToLowerInvariant()}.");
+            throw new DomainException(
+                $"Variation '{variation.Key}' value is not a valid {type.ToString().ToLowerInvariant()}.");
         }
     }
 }

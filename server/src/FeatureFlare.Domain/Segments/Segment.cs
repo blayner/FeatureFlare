@@ -71,9 +71,11 @@ public sealed class Segment : AggregateRoot
         IEnumerable<string> excluded,
         IEnumerable<SegmentRule> rules)
     {
-        Name = Guard.NotEmpty(name, "Segment name");
-        Description = Guard.Optional(description, "Segment description");
+        var validName = Guard.NotEmpty(name, "Segment name");
+        var validDescription = Guard.Optional(description, "Segment description");
         Apply(included, excluded, rules);
+        Name = validName;
+        Description = validDescription;
         Touch();
     }
 
