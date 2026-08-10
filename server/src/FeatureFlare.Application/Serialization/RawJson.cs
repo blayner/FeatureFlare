@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-namespace FeatureFlare.Api.Contracts;
+namespace FeatureFlare.Application.Serialization;
 
-internal static class JsonValues
+public static class RawJson
 {
     /// <summary>Turns a stored raw JSON value into an element that serializes as-is (not as a string).</summary>
     public static JsonElement ToElement(string rawJson)

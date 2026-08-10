@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using FeatureFlare.Application.Serialization;
 using FeatureFlare.Application.Flags;
 using FeatureFlare.Domain.Flags;
 
@@ -10,7 +11,7 @@ public sealed record VariationDto(string Key, JsonElement Value, string? Name = 
     public Variation ToDomain() => new(Key, Value.GetRawText(), Name);
 
     public static VariationDto From(Variation variation) =>
-        new(variation.Key, JsonValues.ToElement(variation.Value), variation.Name);
+        new(variation.Key, RawJson.ToElement(variation.Value), variation.Name);
 }
 
 public sealed record CreateFlagRequest(

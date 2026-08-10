@@ -1,5 +1,6 @@
 using FeatureFlare.Application.Abstractions;
 using FeatureFlare.Infrastructure.Persistence.InMemory;
+using FeatureFlare.Infrastructure.Streaming;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +13,11 @@ public static class DependencyInjection
         services.AddSingleton<IFlagRepository, InMemoryFlagRepository>();
         services.AddSingleton<ISegmentRepository, InMemorySegmentRepository>();
         services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
+
+        services.AddSingleton<ISseBroadcaster, SseBroadcaster>();
+        services.AddSingleton<IChangePublisher, SseChangePublisher>();
+        services.AddHostedService<SseHeartbeatService>();
+
         return services;
     }
 }

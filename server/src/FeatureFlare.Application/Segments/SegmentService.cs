@@ -24,7 +24,8 @@ public sealed record UpdateSegmentCommand(
 public sealed class SegmentService(
     ISegmentRepository segments,
     IFlagRepository flags,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IChangePublisher publisher)
 {
     public Task<IReadOnlyList<Segment>> ListAsync(CancellationToken ct = default) => segments.ListAsync(ct);
 
@@ -43,6 +44,7 @@ public sealed class SegmentService(
 
         segments.Add(segment);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.SegmentUpdatedAsync(segment, ct);
         return segment;
     }
 
@@ -56,6 +58,7 @@ public sealed class SegmentService(
 
         segment.Update(command.Name, command.Description, command.Included, command.Excluded, command.Rules);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.SegmentUpdatedAsync(segment, ct);
         return segment;
     }
 
@@ -77,5 +80,6 @@ public sealed class SegmentService(
 
         segments.Remove(segment);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.SegmentDeletedAsync(segment.Key, segment.Version + 1, ct);
     }
 }

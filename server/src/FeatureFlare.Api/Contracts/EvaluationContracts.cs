@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using FeatureFlare.Application.Serialization;
 using FeatureFlare.Domain.Evaluation;
 
 namespace FeatureFlare.Api.Contracts;
@@ -20,7 +21,7 @@ public sealed record FlagEvaluationDto(
 {
     public static FlagEvaluationDto From(FlagEvaluation evaluation) => new(
         evaluation.VariationKey,
-        JsonValues.ToElementOrNull(evaluation.Value),
+        RawJson.ToElementOrNull(evaluation.Value),
         evaluation.Reason,
         evaluation.RuleId,
         evaluation.Error);

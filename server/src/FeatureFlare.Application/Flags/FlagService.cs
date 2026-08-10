@@ -7,7 +7,8 @@ namespace FeatureFlare.Application.Flags;
 public sealed class FlagService(
     IFlagRepository flags,
     ISegmentRepository segments,
-    IUnitOfWork unitOfWork)
+    IUnitOfWork unitOfWork,
+    IChangePublisher publisher)
 {
     public Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken ct = default) => flags.ListAsync(ct);
 
@@ -41,6 +42,7 @@ public sealed class FlagService(
 
         flags.Add(flag);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.FlagUpdatedAsync(flag, ct);
         return flag;
     }
 
@@ -61,6 +63,7 @@ public sealed class FlagService(
             rules);
 
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.FlagUpdatedAsync(flag, ct);
         return flag;
     }
 
@@ -71,6 +74,7 @@ public sealed class FlagService(
 
         flag.SetEnabled(command.Enabled);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.FlagUpdatedAsync(flag, ct);
         return flag;
     }
 
@@ -79,6 +83,7 @@ public sealed class FlagService(
         var flag = await GetAsync(command.Key, ct);
         flags.Remove(flag);
         await unitOfWork.SaveChangesAsync(ct);
+        await publisher.FlagDeletedAsync(flag.Key, flag.Version + 1, ct);
     }
 
     private async Task EnsureSegmentsExistAsync(string flagKey, IEnumerable<TargetingRule> rules, CancellationToken ct)
