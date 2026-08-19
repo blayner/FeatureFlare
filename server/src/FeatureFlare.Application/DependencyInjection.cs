@@ -1,4 +1,5 @@
 using FeatureFlare.Application.Evaluation;
+using FeatureFlare.Application.Experiments;
 using FeatureFlare.Application.Flags;
 using FeatureFlare.Application.Sdk;
 using FeatureFlare.Application.Segments;
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<FlagService>();
         services.AddScoped<SegmentService>();
         services.AddScoped<EvaluationService>();
+        services.AddScoped<ExperimentService>();
         services.AddScoped<SdkConfigService>();
         return services;
     }

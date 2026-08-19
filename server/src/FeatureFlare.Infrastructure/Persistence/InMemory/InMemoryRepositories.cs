@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using FeatureFlare.Application.Abstractions;
+using FeatureFlare.Domain.Experiments;
 using FeatureFlare.Domain.Flags;
 using FeatureFlare.Domain.Segments;
 
@@ -43,6 +44,21 @@ public sealed class InMemorySegmentRepository : ISegmentRepository
     public void Add(Segment segment) => _segments[segment.Key] = segment;
 
     public void Remove(Segment segment) => _segments.TryRemove(segment.Key, out _);
+}
+
+public sealed class InMemoryExperimentRepository : IExperimentRepository
+{
+    private readonly ConcurrentDictionary<string, Experiment> _experiments = new(StringComparer.Ordinal);
+
+    public Task<Experiment?> GetByKeyAsync(string key, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_experiments.GetValueOrDefault(key));
+
+    public Task<IReadOnlyList<Experiment>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Experiment>>(_experiments.Values.OrderBy(e => e.Key, StringComparer.Ordinal).ToList());
+
+    public void Add(Experiment experiment) => _experiments[experiment.Key] = experiment;
+
+    public void Remove(Experiment experiment) => _experiments.TryRemove(experiment.Key, out _);
 }
 
 public sealed class InMemoryUnitOfWork : IUnitOfWork

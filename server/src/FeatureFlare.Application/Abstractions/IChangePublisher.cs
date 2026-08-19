@@ -1,3 +1,4 @@
+using FeatureFlare.Domain.Experiments;
 using FeatureFlare.Domain.Flags;
 using FeatureFlare.Domain.Segments;
 
@@ -16,4 +17,8 @@ public interface IChangePublisher
     ValueTask SegmentUpdatedAsync(Segment segment, CancellationToken ct = default);
 
     ValueTask SegmentDeletedAsync(string key, int version, CancellationToken ct = default);
+
+    ValueTask ExperimentUpdatedAsync(Experiment experiment, CancellationToken ct = default);
+
+    ValueTask ExperimentDeletedAsync(string key, int version, CancellationToken ct = default);
 }

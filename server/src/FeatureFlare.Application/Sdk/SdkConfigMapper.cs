@@ -1,4 +1,5 @@
 using FeatureFlare.Application.Serialization;
+using FeatureFlare.Domain.Experiments;
 using FeatureFlare.Domain.Flags;
 using FeatureFlare.Domain.Segments;
 
@@ -23,4 +24,16 @@ public static class SdkConfigMapper
         segment.Excluded,
         segment.Rules,
         segment.Version);
+
+    public static SdkExperimentConfig ToSdk(this Experiment experiment) => new(
+        experiment.Key,
+        experiment.Status,
+        experiment.TrafficAllocation,
+        experiment.Salt,
+        experiment.ControlVariant,
+        experiment.PrimaryMetric,
+        experiment.Variants
+            .Select(v => new SdkExperimentVariant(v.Key, v.Weight, RawJson.ToElementOrNull(v.Payload)))
+            .ToList(),
+        experiment.Version);
 }

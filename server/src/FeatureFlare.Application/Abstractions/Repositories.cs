@@ -1,3 +1,4 @@
+using FeatureFlare.Domain.Experiments;
 using FeatureFlare.Domain.Flags;
 using FeatureFlare.Domain.Segments;
 
@@ -27,6 +28,17 @@ public interface ISegmentRepository
     void Add(Segment segment);
 
     void Remove(Segment segment);
+}
+
+public interface IExperimentRepository
+{
+    Task<Experiment?> GetByKeyAsync(string key, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Experiment>> ListAsync(CancellationToken cancellationToken = default);
+
+    void Add(Experiment experiment);
+
+    void Remove(Experiment experiment);
 }
 
 public interface IUnitOfWork

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FeatureFlare.Domain.Experiments;
 using FeatureFlare.Domain.Flags;
 using FeatureFlare.Domain.Segments;
 
@@ -27,9 +28,22 @@ public sealed record SdkSegmentConfig(
     IReadOnlyList<SegmentRule> Rules,
     int Version);
 
+public sealed record SdkExperimentVariant(string Key, int Weight, JsonElement? Payload);
+
+public sealed record SdkExperimentConfig(
+    string Key,
+    ExperimentStatus Status,
+    int TrafficAllocation,
+    string Salt,
+    string ControlVariant,
+    string PrimaryMetric,
+    IReadOnlyList<SdkExperimentVariant> Variants,
+    int Version);
+
 public sealed record SdkConfig(
     IReadOnlyList<SdkFlagConfig> Flags,
     IReadOnlyList<SdkSegmentConfig> Segments,
+    IReadOnlyList<SdkExperimentConfig> Experiments,
     DateTimeOffset GeneratedAt);
 
 /// <summary>Payload of <c>*.deleted</c> stream events.</summary>

@@ -12,6 +12,7 @@ public static class DependencyInjection
     {
         services.AddSingleton<IFlagRepository, InMemoryFlagRepository>();
         services.AddSingleton<ISegmentRepository, InMemorySegmentRepository>();
+        services.AddSingleton<IExperimentRepository, InMemoryExperimentRepository>();
         services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
 
         services.AddSingleton<ISseBroadcaster, SseBroadcaster>();
