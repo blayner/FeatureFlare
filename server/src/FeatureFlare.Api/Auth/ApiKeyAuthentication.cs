@@ -11,6 +11,8 @@ public static class ApiKeyDefaults
 {
     public const string Scheme = "ApiKey";
     public const string HeaderName = "X-Api-Key";
+    public const string QueryParameter = "sdkKey";
+    public const string StreamPath = "/api/stream";
     public const string KeyTypeClaim = "featureflare:key-type";
     public const string AdminKeyType = "admin";
     public const string SdkKeyType = "sdk";
@@ -44,14 +46,14 @@ public sealed class ApiKeyAuthenticationHandler(
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var presented = ReadKey();
+        var (presented, fromQuery) = ReadKey();
         if (presented is null)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
         string? keyType = null;
-        if (Matches(presented, Options.AdminKeys))
+        if (!fromQuery && Matches(presented, Options.AdminKeys))
         {
             keyType = ApiKeyDefaults.AdminKeyType;
         }
@@ -77,19 +79,33 @@ public sealed class ApiKeyAuthenticationHandler(
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 
-    private string? ReadKey()
+    private (string? Key, bool FromQuery) ReadKey()
     {
         if (Request.Headers.TryGetValue(ApiKeyDefaults.HeaderName, out var headerKey) &&
             !string.IsNullOrWhiteSpace(headerKey))
         {
-            return headerKey.ToString().Trim();
+            return (headerKey.ToString().Trim(), false);
         }
 
         var authorization = Request.Headers.Authorization.ToString();
         const string bearer = "Bearer ";
-        return authorization.StartsWith(bearer, StringComparison.OrdinalIgnoreCase)
-            ? authorization[bearer.Length..].Trim()
-            : null;
+        if (authorization.StartsWith(bearer, StringComparison.OrdinalIgnoreCase))
+        {
+            return (authorization[bearer.Length..].Trim(), false);
+        }
+
+        // The browser-native EventSource API cannot set headers, so the stream endpoint (and only it)
+        // also accepts the key as a query parameter. Only SDK keys are honoured there: admin keys must
+        // never end up in URLs and access logs.
+        if (HttpMethods.IsGet(Request.Method) &&
+            Request.Path.Equals(ApiKeyDefaults.StreamPath, StringComparison.OrdinalIgnoreCase) &&
+            Request.Query.TryGetValue(ApiKeyDefaults.QueryParameter, out var queryKey) &&
+            !string.IsNullOrWhiteSpace(queryKey))
+        {
+            return (queryKey.ToString().Trim(), true);
+        }
+
+        return (null, false);
     }
 
     /// <summary>Constant-time comparison to avoid leaking key prefixes through timing.</summary>
