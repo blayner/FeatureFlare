@@ -18,6 +18,8 @@ public static class DependencyInjection
         services.AddScoped<SegmentService>();
         services.AddScoped<EvaluationService>();
         services.AddScoped<ExperimentService>();
+        services.AddScoped<ExperimentEventService>();
+        services.AddScoped<ExperimentResultsService>();
         services.AddScoped<SdkConfigService>();
         return services;
     }

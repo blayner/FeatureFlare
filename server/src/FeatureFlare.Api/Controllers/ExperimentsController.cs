@@ -10,8 +10,19 @@ namespace FeatureFlare.Api.Controllers;
 [Route("api/experiments")]
 [Authorize(Policy = Policies.Admin)]
 [Produces("application/json")]
-public sealed class ExperimentsController(ExperimentService experiments) : ControllerBase
+public sealed class ExperimentsController(ExperimentService experiments, ExperimentResultsService results) : ControllerBase
 {
+    /// <summary>
+    /// Per-variant exposure/conversion counts and a two-proportion z-test against the control.
+    /// </summary>
+    [HttpGet("{key}/results")]
+    public Task<ExperimentResults> Results(
+        string key,
+        [FromQuery] string? metric,
+        [FromQuery] double alpha = ExperimentResultsService.DefaultSignificanceLevel,
+        CancellationToken ct = default) =>
+        results.GetAsync(key, metric, Math.Clamp(alpha, 0.001, 0.2), ct);
+
     [HttpGet]
     public async Task<IEnumerable<ExperimentResponse>> List(CancellationToken ct) =>
         (await experiments.ListAsync(ct)).Select(ExperimentResponse.From);
