@@ -56,6 +56,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-app.Run();
+await app.Services.InitializeDatabaseAsync(app.Configuration);
+await app.RunAsync();
 
 public partial class Program;

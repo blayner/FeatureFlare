@@ -83,7 +83,7 @@ public sealed class ExperimentEvent
         }
 
         // Clock skew protection: SDK clocks can't be trusted to be in the future.
-        var occurred = occurredAt > receivedAt ? receivedAt : occurredAt;
+        var occurred = (occurredAt > receivedAt ? receivedAt : occurredAt).ToUniversalTime();
 
         return new ExperimentEvent
         {
@@ -95,7 +95,7 @@ public sealed class ExperimentEvent
             Metric = metric,
             Value = value,
             OccurredAt = occurred,
-            ReceivedAt = receivedAt,
+            ReceivedAt = receivedAt.ToUniversalTime(),
         };
     }
 }
