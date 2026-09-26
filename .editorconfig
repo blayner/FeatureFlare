@@ -26,3 +26,10 @@ dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.underscore_camel_case.required_prefix = _
 dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+# LoggerMessage source generators are worth it on hot paths only; the few log calls here are on
+# connection/lifecycle paths, so the generic extension methods are fine.
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA1873.severity = none
+# Enum members such as FlagType.String mirror the public wire contract.
+dotnet_diagnostic.CA1720.severity = none

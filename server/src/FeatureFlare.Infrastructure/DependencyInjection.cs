@@ -70,6 +70,6 @@ public static class DependencyInjection
 
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DependencyInjection));
         var created = await db.Database.EnsureCreatedAsync();
-        logger.LogInformation(created ? "FeatureFlare schema created" : "FeatureFlare schema already exists");
+        logger.LogInformation("FeatureFlare schema initialized (created: {Created})", created);
     }
 }
