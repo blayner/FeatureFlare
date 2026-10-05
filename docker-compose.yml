@@ -1,0 +1,48 @@
+# Local full stack: PostgreSQL + FeatureFlare API.
+#
+#   docker compose up --build
+#   curl -H "X-Api-Key: local-admin-key" http://localhost:5000/api/flags
+#
+# Keys below are for local use only. Override them with environment variables or a .env file.
+
+name: featureflare
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: featureflare
+      POSTGRES_USER: featureflare
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-featureflare}
+    ports:
+      - "5432:5432"
+    volumes:
+      # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/<major>/docker,
+      # so the volume is mounted one level up (not at .../data as with older images).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U featureflare -d featureflare"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Persistence__Provider: Postgres
+      Persistence__AutoCreateSchema: "true"
+      ConnectionStrings__FeatureFlare: "Host=postgres;Database=featureflare;Username=featureflare;Password=${POSTGRES_PASSWORD:-featureflare}"
+      Auth__AdminKeys__0: ${FEATUREFLARE_ADMIN_KEY:-local-admin-key}
+      Auth__SdkKeys__0: ${FEATUREFLARE_SDK_KEY:-local-sdk-key}
+    ports:
+      - "5000:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

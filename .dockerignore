@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/coverage/
+**/TestResults/
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+*.md
+!spec/*.md
+**/appsettings.Development.json
+**/appsettings.Local.json
+.env
