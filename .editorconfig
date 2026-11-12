@@ -33,3 +33,7 @@ dotnet_diagnostic.CA1848.severity = none
 dotnet_diagnostic.CA1873.severity = none
 # Enum members such as FlagType.String mirror the public wire contract.
 dotnet_diagnostic.CA1720.severity = none
+
+# Test names use underscores for readability (Given_When_Then style).
+[**/tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none

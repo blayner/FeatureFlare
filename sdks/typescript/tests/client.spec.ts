@@ -10,20 +10,34 @@ interface Recorded {
   headers: Record<string, string>;
 }
 
-function fakeFetch(options: { stream?: string } = {}) {
+interface FakeServerOptions {
+  /** SSE payload written as a single chunk once `streamGate` resolves. */
+  stream?: string;
+  /** The config response is held until this resolves. */
+  configGate?: Promise<void>;
+  streamGate?: Promise<void>;
+}
+
+function fakeFetch(options: FakeServerOptions = {}) {
   const calls: Recorded[] = [];
   const impl: typeof fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const headers = (init?.headers ?? {}) as Record<string, string>;
     calls.push({ url, method: init?.method ?? 'GET', body: init?.body as string | undefined, headers });
 
-    if (url.endsWith('/api/sdk/config')) return Response.json(sampleConfig());
+    if (url.endsWith('/api/sdk/config')) {
+      await options.configGate;
+      return Response.json(sampleConfig());
+    }
     if (url.endsWith('/api/events')) return new Response(null, { status: 202 });
     if (url.endsWith('/api/stream') && options.stream !== undefined) {
+      const payload = options.stream;
       const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode(options.stream));
-          // Keep the connection open like a real server would.
+        async start(controller) {
+          await options.streamGate;
+          // All events in one chunk, as proxies and HTTP/2 frames often coalesce them. The connection is
+          // left open, like a real server would.
+          controller.enqueue(new TextEncoder().encode(payload));
         },
       });
       return new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
@@ -31,6 +45,16 @@ function fakeFetch(options: { stream?: string } = {}) {
     return new Response(null, { status: 404 });
   };
   return { impl, calls };
+}
+
+function streamedChanges(): string {
+  const updated: FlagConfig = { ...sampleConfig().flags[0]!, enabled: false, version: 4 };
+  const stale: FlagConfig = { ...sampleConfig().flags[0]!, enabled: true, version: 2 };
+  return (
+    `event: flag.updated\ndata: ${JSON.stringify(updated)}\n\n` +
+    `event: flag.updated\ndata: ${JSON.stringify(stale)}\n\n` +
+    `event: flag.deleted\ndata: {"key":"max-items","version":2}\n\n`
+  );
 }
 
 const clients: FeatureFlareClient[] = [];
@@ -91,24 +115,39 @@ describe('FeatureFlareClient', () => {
     expect(events.every((e) => e.variant === variant)).toBe(true);
   });
 
-  it('applies streamed updates, ignores stale versions and emits flagChanged', async () => {
-    const updated: FlagConfig = { ...sampleConfig().flags[0]!, enabled: false, version: 4 };
-    const stale: FlagConfig = { ...sampleConfig().flags[0]!, enabled: true, version: 2 };
-    const stream =
-      `event: flag.updated\ndata: ${JSON.stringify(updated)}\n\n` +
-      `event: flag.updated\ndata: ${JSON.stringify(stale)}\n\n` +
-      `event: flag.deleted\ndata: {"key":"max-items","version":2}\n\n`;
-
-    const client = createClient(fakeFetch({ stream }).impl, true);
+  it('applies streamed updates after initialization, ignores stale versions and emits flagChanged', async () => {
+    let releaseStream!: () => void;
+    const streamGate = new Promise<void>((resolve) => (releaseStream = resolve));
+    const client = createClient(fakeFetch({ stream: streamedChanges(), streamGate }).impl, true);
     const changed: string[] = [];
     client.on('flagChanged', (key) => changed.push(key));
 
     await client.initialize();
-    await expect.poll(() => changed.length).toBeGreaterThanOrEqual(2);
+    releaseStream();
+    await expect.poll(() => changed.length).toBe(2);
 
     expect(client.getBooleanValue('new-ui', true, { userId: 'ana' })).toBe(false);
     expect(client.getNumberValue('max-items', -1, { userId: 'u1' })).toBe(-1);
     expect(changed).toEqual(['new-ui', 'max-items']);
+  });
+
+  it('does not let the initial snapshot roll back stream events that arrived before it', async () => {
+    // Regression: the stream body can be read before the config response is parsed (it happened
+    // consistently on Node 22). The older snapshot used to overwrite the streamed v4 update and bring
+    // back the flag deleted on the stream.
+    let releaseConfig!: () => void;
+    const configGate = new Promise<void>((resolve) => (releaseConfig = resolve));
+    const client = createClient(fakeFetch({ stream: streamedChanges(), configGate }).impl, true);
+    client.on('flagChanged', (key) => {
+      // The whole chunk is applied synchronously, so the snapshot resolves only after all three events.
+      if (key === 'new-ui') releaseConfig();
+    });
+
+    await client.initialize();
+
+    expect(client.isReady).toBe(true);
+    expect(client.getBooleanValue('new-ui', true, { userId: 'ana' })).toBe(false);
+    expect(client.getNumberValue('max-items', -1, { userId: 'u1' })).toBe(-1);
   });
 
   it('keeps serving defaults when the server is unreachable', async () => {

@@ -286,6 +286,8 @@ export class FeatureFlareClient extends TypedEmitter<ClientEvents> {
   }
 
   private async download(): Promise<void> {
+    // Stream events applied after this point are newer than the snapshot we are about to request.
+    const since = this.cache.mark();
     try {
       const response = await this.fetchImpl(`${this.options.baseUrl}/api/sdk/config`, {
         headers: { Accept: 'application/json', Authorization: `Bearer ${this.options.apiKey}` },
@@ -294,7 +296,7 @@ export class FeatureFlareClient extends TypedEmitter<ClientEvents> {
 
       const config = (await response.json()) as SdkConfig;
       const wasReady = this.isReady;
-      const changed = this.cache.replaceAll(config);
+      const changed = this.cache.replaceAll(config, since);
       if (wasReady) {
         for (const key of changed) this.emit('flagChanged', key, this.cache.getFlag(key));
       }

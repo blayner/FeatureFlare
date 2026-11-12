@@ -297,6 +297,8 @@ public sealed class FeatureFlareClient : IFeatureFlareClient, IAsyncDisposable, 
             return;
         }
 
+        // Stream events applied after this point are newer than the snapshot we are about to request.
+        var since = _store.Mark();
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, _options.Endpoint("api/sdk/config"));
@@ -309,7 +311,7 @@ public sealed class FeatureFlareClient : IFeatureFlareClient, IAsyncDisposable, 
                 .ConfigureAwait(false) ?? throw new InvalidOperationException("Empty configuration response.");
 
             var wasReady = _store.IsInitialized;
-            var changed = _store.ReplaceAll(config);
+            var changed = _store.ReplaceAll(config, since);
             if (wasReady)
             {
                 foreach (var key in changed)
