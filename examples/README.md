@@ -24,6 +24,10 @@ curl -X POST http://localhost:5000/api/experiments/checkout-flow/start -H "X-Api
 | [`node-http`](node-http) | `cd sdks/typescript && npm ci && npm run build && cd ../../examples/node-http && npm install ../../sdks/typescript && node server.mjs` |
 | [`dotnet-minimal-api`](dotnet-minimal-api) | `dotnet run --project examples/dotnet-minimal-api` |
 
+Against the `docker compose` stack instead, swap the keys (`local-admin-key` for the curl calls) and
+pass the SDK key to the examples: `FEATUREFLARE_SDK_KEY=local-sdk-key node server.mjs` or
+`FeatureFlare__ApiKey=local-sdk-key dotnet run --project examples/dotnet-minimal-api`.
+
 Then toggle a flag and watch the example log the change, delivered over SSE:
 
 ```bash

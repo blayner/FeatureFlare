@@ -155,6 +155,28 @@ curl -X POST http://localhost:5000/api/flags \
   }'
 ```
 
+### Evaluate on the server
+
+SDKs evaluate locally; untrusted clients (browsers, mobile) call the server instead. Over REST the
+context's identifier field is `key` (the SDKs call it `userId` and map it for you):
+
+```bash
+curl -X POST http://localhost:5000/api/evaluate/new-checkout \
+  -H "X-Api-Key: dev-sdk-key" -H "Content-Type: application/json" \
+  -d '{ "key": "u-123", "attributes": { "plan": "enterprise" } }'
+# {"variation":"on","value":true,"reason":"ruleMatch","ruleId":"beta-testers","error":null}
+
+# Admin key: explain why a context got its value
+curl -X POST http://localhost:5000/api/flags/new-checkout/evaluate \
+  -H "X-Api-Key: dev-admin-key" -H "Content-Type: application/json" \
+  -d '{ "key": "u-123", "attributes": { "plan": "free" } }'
+
+# Watch changes as they happen (SSE); toggle the flag in another terminal
+curl -N -H "X-Api-Key: dev-sdk-key" http://localhost:5000/api/stream
+```
+
+With `docker compose`, use `local-sdk-key` / `local-admin-key` instead of the `dev-*` keys.
+
 ### TypeScript
 
 ```ts
