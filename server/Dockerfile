@@ -11,12 +11,13 @@ COPY server/src/FeatureFlare.Domain/FeatureFlare.Domain.csproj server/src/Featur
 COPY server/src/FeatureFlare.Application/FeatureFlare.Application.csproj server/src/FeatureFlare.Application/
 COPY server/src/FeatureFlare.Infrastructure/FeatureFlare.Infrastructure.csproj server/src/FeatureFlare.Infrastructure/
 COPY server/src/FeatureFlare.Api/FeatureFlare.Api.csproj server/src/FeatureFlare.Api/
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet restore server/src/FeatureFlare.Api/FeatureFlare.Api.csproj
+# Packages live in this layer on purpose (no BuildKit cache mount): CI restores layers from the
+# GitHub Actions cache but not cache-mount contents, so a cached restore layer plus an empty mount
+# made `publish --no-restore` fail with NETSDK1064 whenever only source files changed.
+RUN dotnet restore server/src/FeatureFlare.Api/FeatureFlare.Api.csproj
 
 COPY server/src server/src
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
-    dotnet publish server/src/FeatureFlare.Api/FeatureFlare.Api.csproj \
+RUN dotnet publish server/src/FeatureFlare.Api/FeatureFlare.Api.csproj \
       -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
